@@ -3,839 +3,1011 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NonUpdate Helper Beta</title>
-    <!-- Load Tailwind CSS for modern styling -->
+    <title>Unified Logistics Analyzer</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load SheetJS (js-xlsx) for Excel parsing -->
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- SheetJS -->
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
-    <!-- Load Chart.js for Visualization -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
     <style>
-        /* Custom styles for better aesthetics */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f9fb;
-            color: #1f2937;
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        
+        /* Custom Scrollbar for tables */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; }
+
+        /* Animations */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95); z-index: 50;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            visibility: hidden; opacity: 0; transition: all 0.3s;
         }
-        .container {
-            max-width: 1000px;
-        }
-        .collapse-header {
-            cursor: pointer;
-            user-select: none;
-            transition: background-color 0.2s;
-        }
-        .collapse-header:hover {
-            background-color: #e5e7eb;
-        }
-        .pivot-table-container {
-            max-height: 400px;
-            overflow-y: auto;
-            margin-top: 1rem;
-        }
-        .tno-list {
-            background-color: #f3f4f6;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            max-height: 150px;
-            overflow-y: scroll;
-            margin-top: 1rem;
-            font-size: 0.875rem;
-        }
-        .copy-btn-group button {
-            transition: all 0.2s;
-        }
-        .copy-btn-group button:hover {
-            opacity: 0.8;
-            transform: translateY(-1px);
-        }
-        /* Style for clickable pivot rows */
-        .clickable-row {
-            cursor: pointer;
-            transition: background-color 0.1s;
-        }
-        .clickable-row:hover {
-            background-color: #f3f4f6 !important;
-        }
-        .selected-row {
-            background-color: #bfdbfe !important; /* Tailwind blue-200 */
-            font-weight: 600;
-        }
+        .loading-overlay.visible { visibility: visible; opacity: 1; }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="text-slate-900">
 
-<div class="container mx-auto bg-white p-6 md:p-10 shadow-xl rounded-xl">
-    <h1 class="text-3xl font-extrabold text-indigo-700 mb-6 border-b pb-2">NonUpdate Helper Beta</h1>
-
-    <!-- File Upload Section -->
-    <div class="mb-8 p-4 border border-indigo-200 bg-indigo-50 rounded-lg">
-        <label class="block text-lg font-medium text-gray-700 mb-2" for="excelFile">
-            Upload Excel File (.xlsx or .xls)
-        </label>
-        <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="block w-full text-sm text-gray-500
-            file:mr-4 file:py-2 file:px-4
-            file:rounded-full file:border-0
-            file:text-sm file:font-semibold
-            file:bg-indigo-50 file:text-indigo-700
-            hover:file:bg-indigo-100 cursor-pointer
-        "/>
-        <p id="processing-status" class="mt-3 text-sm font-semibold text-gray-600 hidden">
-            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Processing file... please wait.
-        </p>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="animate-spin text-indigo-600 mb-4">
+            <i data-lucide="loader-2" class="w-10 h-10"></i>
+        </div>
+        <p class="text-lg font-semibold text-slate-700" id="loading-text">Processing Data...</p>
     </div>
 
-    <!-- Output Sections Container -->
-    <div id="output-container" class="space-y-6 hidden">
-
-        <!-- Destination Warehouse Filter Toggle (Primary Filter) -->
-        <div class="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg">
-            <label class="block text-lg font-medium text-gray-700 mb-2" for="whs-filter">
-                Filter Analysis by Destination Warehouse (Dest. WHS)
-            </label>
-            <select id="whs-filter" class="w-full md:w-1/3 p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                <!-- Options populated by JS -->
-            </select>
-        </div>
-
-        <!-- Section 1: Before 200 Analysis -->
-        <div class="border rounded-lg shadow-md overflow-hidden">
-            <div id="header-before-200" class="collapse-header p-4 bg-gray-100 text-xl font-semibold text-gray-800 flex justify-between items-center">
-                <span>1. Before 200 Analysis (Status 195/199)</span>
-                <span class="transform transition-transform duration-300" id="icon-before-200">▼</span>
+    <!-- Navigation -->
+    <nav class="bg-slate-900 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-indigo-500 p-1.5 rounded-lg">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5 text-white"></i>
+                </div>
+                <span class="font-bold text-lg tracking-tight">Non-update analyzer</span>
             </div>
-            <div id="content-before-200" class="p-4 border-t" style="display: block;">
+            <div class="text-sm text-slate-400">
+                Status: <span id="system-status" class="text-emerald-400 font-medium">Ready for Upload</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 pb-16">
+
+        <!-- ==================== UPLOAD SECTION ==================== -->
+        <div id="upload-section" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Step 1 Card -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <i data-lucide="file-spreadsheet" class="w-24 h-24 text-indigo-600"></i>
+                </div>
+                <h2 class="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+                    <span class="bg-indigo-100 text-indigo-700 w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span>
+                    Base File (NonUpdate)
+                </h2>
+                <p class="text-sm text-slate-500 mb-4">Upload Nonupdate Data Excel from PowerBI</p>
                 
-                <!-- Date Reference Input -->
-                <div class="mb-4">
-                    <label for="reference-date" class="block text-sm font-medium text-gray-700">Reference Date (for "Days Ago" calculation):</label>
-                    <input type="date" id="reference-date" 
-                           class="mt-1 p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                           value="">
+                <label class="block">
+                    <span class="sr-only">Choose file</span>
+                    <input type="file" id="file1" accept=".xlsx, .xls, .csv" 
+                        class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition-colors"/>
+                </label>
+                <div id="status-step1" class="mt-3 text-xs font-medium text-slate-400 min-h-[20px]">Waiting for file...</div>
+            </div>
+
+            <!-- Step 2 Card -->
+            <div id="step2-container" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 relative overflow-hidden group opacity-50 pointer-events-none transition-all">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <i data-lucide="users" class="w-24 h-24 text-blue-600"></i>
+                </div>
+                <h2 class="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+                    <span class="bg-blue-100 text-blue-700 w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
+                    Driver Files (Update Check)
+                </h2>
+                <p class="text-sm text-slate-500 mb-4">Upload MultiSearch Record File(s) <br><span class="text-xs text-blue-600 font-semibold">Checks for Status > 200 (excl. 255)</span></p>
+                
+                <label class="block">
+                    <span class="sr-only">Choose file</span>
+                    <input type="file" id="file2" multiple accept=".xlsx, .xls, .csv" 
+                        class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer transition-colors"/>
+                </label>
+                <div id="status-step2" class="mt-3 text-xs font-medium text-slate-400 min-h-[20px]">Waiting for Step 1...</div>
+            </div>
+        </div>
+
+        <!-- ==================== DASHBOARD VIEW ==================== -->
+        <div id="dashboard-view" class="space-y-8 hidden fade-in">
+            
+            <!-- Global Filter -->
+            <div class="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                    <h3 class="font-bold text-slate-800">Global Filters</h3>
+                    <p class="text-xs text-slate-500">Filters apply to sections below.</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-slate-600">Reference Date:</label>
+                        <input type="date" id="reference-date" class="text-sm border-slate-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    <select id="whs-filter" class="text-sm border-slate-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 min-w-[150px]">
+                        <!-- Populated by JS -->
+                    </select>
+                    <button onclick="resetAnalysis()" class="text-sm text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1.5 rounded transition">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION: PRE-MOVED (BASE FILE CHECK) -->
+            <section id="base-moved-section" class="hidden">
+                <div class="bg-amber-50 rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-amber-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-amber-900 flex items-center gap-2">
+                                <i data-lucide="alert-circle" class="w-5 h-5 text-amber-600"></i>
+                                Please download Status>200 Tracking Information
+                            </h2>
+                            <p class="text-xs text-amber-700 mt-1">
+                                <span id="base-moved-count" class="font-bold">0</span> records found in Base File with Status > 200 (excluding 255).
+                                Use these to download updated Driver data.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <h4 class="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-3">Copy TNOs (Batch 400)</h4>
+                        <div id="copy-base-moved" class="flex flex-wrap gap-2">
+                            <!-- Copy Buttons -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 1: A-SCAN ANALYSIS -->
+            <section>
+                <div class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="package-search" class="w-5 h-5 text-indigo-600"></i>
+                            A-Scan Analysis
+                        </h2>
+                        <span class="text-xs font-medium text-slate-500">Base Filter: Status 195/199</span>
+                    </div>
+                    
+                    <div class="flex items-center gap-4">
+                        <!-- 195/199 Toggles -->
+                        <div class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg p-1.5 shadow-sm">
+                            <label class="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer px-2 select-none hover:text-indigo-600 transition-colors">
+                                <input type="checkbox" id="toggle-195" checked class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"> 
+                                Status 195
+                            </label>
+                            <div class="w-px h-4 bg-slate-200"></div>
+                            <label class="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer px-2 select-none hover:text-indigo-600 transition-colors">
+                                <input type="checkbox" id="toggle-199" checked class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"> 
+                                Status 199
+                            </label>
+                        </div>
+                        <span class="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded hidden md:inline-block">Select card to filter</span>
+                    </div>
+                </div>
+                
+                <!-- Date Filters (Quick Toggles) -->
+                <div id="time-filters-s1" class="flex flex-wrap gap-2 mb-4">
+                    <!-- Populated by JS -->
                 </div>
 
-                <!-- Time Filters -->
-                <h3 class="text-lg font-bold mb-3 text-indigo-600">Time Filters (Inactivity Time UTC)</h3>
-                <div id="date-filters-before-200" class="flex flex-wrap gap-2 mb-4">
-                    <!-- Buttons will be generated here -->
+                <!-- A-Scan Cards Grid -->
+                <div id="ascan-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+                    <!-- Populated by JS -->
                 </div>
 
-                <!-- Pivot Table: A-Scan WHS (Clickable for secondary filter) -->
-                <h3 class="text-lg font-bold mb-3 mt-4 text-indigo-600">Count of TNO by A-Scan WHS
-                    <span id="selected-ascan" class="text-sm font-normal text-gray-500 italic ml-2"></span>
-                </h3>
-                <div class="pivot-table-container border rounded-md">
-                    <table id="pivot-table-before-200" class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50 sticky top-0">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">A-Scan WHS</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TNO Count</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="2" class="px-6 py-4 text-center text-gray-500">No data loaded.</td></tr>
-                        </tbody>
-                    </table>
+                <!-- Copy Box Section 1 -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="font-semibold text-slate-700 text-sm" id="s1-copy-title">TNO Copy List</h3>
+                        <span id="s1-count" class="text-xs font-mono bg-indigo-100 text-indigo-700 px-2 py-1 rounded">0 items</span>
+                    </div>
+                    <div class="p-4">
+                        <div id="copy-s1" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 2: DRIVER ANALYSIS -->
+            <section id="driver-section" class="hidden">
+                <div class="flex flex-col md:flex-row md:items-end justify-between mb-4 pt-6 border-t border-slate-200 gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="truck" class="w-5 h-5 text-blue-600"></i>
+                            Updated Status Analysis
+                        </h2>
+                        <p class="text-xs text-blue-600 font-medium mt-1">
+                            Showing items from Base List that are now Status > 200 (excluding 255).
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <!-- Exclude Toggle -->
+                        <label class="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none bg-white border border-slate-200 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+                            <input type="checkbox" id="toggle-exclude-exceptions" class="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 border-slate-300">
+                            Exclude 203 / 230 / 213
+                        </label>
+                        
+                        <div class="relative">
+                            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="driver-search" placeholder="Search Driver ID..." 
+                                class="pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 shadow-sm">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Date Filters (Quick Toggles for S2) -->
+                <div id="time-filters-s2" class="flex flex-wrap gap-2 mb-4">
+                    <!-- Populated by JS -->
                 </div>
 
-                <!-- TNO Copy Section -->
-                <h3 class="text-lg font-bold mb-3 mt-6 text-indigo-600">TNO List (Batch Copy)</h3>
-                <div class="copy-btn-group flex flex-wrap gap-3 mb-4" id="copy-buttons-before-200">
-                    <!-- Copy buttons generated here -->
+                <!-- Drivers Table -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[600px]">
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 sticky top-0 z-10">
+                                <tr>
+                                    <th class="px-6 py-3">Driver ID</th>
+                                    <th class="px-6 py-3">Assigned Route(s)</th>
+                                    <th class="px-6 py-3">Dest WHS</th>
+                                    <th class="px-6 py-3 text-right">Matching Packages</th>
+                                    <th class="px-6 py-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="driver-table-body" class="divide-y divide-slate-100">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div id="tno-list-before-200" class="tno-list text-gray-600">
-                    <span class="text-xs italic">TNOs will appear here after filtering.</span>
+            </section>
+        </div>
+
+        <!-- ==================== DRIVER DETAIL VIEW ==================== -->
+        <div id="driver-detail-view" class="hidden fade-in min-h-screen">
+            <!-- Header -->
+            <div class="bg-white border-b border-slate-200 sticky top-0 z-30 mb-6 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4">
+                <button onclick="switchView('dashboard')" class="flex items-center text-sm text-slate-500 hover:text-slate-800 transition-colors mb-2">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-1"></i> Back to Dashboard
+                </button>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2" id="detail-driver-id">
+                            <!-- JS -->
+                        </h1>
+                        <div class="flex items-center gap-3 mt-1 text-sm text-slate-500" id="detail-driver-meta">
+                            <!-- JS -->
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
+                            <div class="text-xs text-blue-600 font-semibold uppercase tracking-wider">Past 200 Pkgs</div>
+                            <div class="text-2xl font-bold text-blue-900" id="detail-total-vol">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detail Content -->
+            <div class="space-y-6">
+                <!-- Package List -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                        <h3 class="font-semibold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="box" class="w-4 h-4 text-slate-500"></i> Package Details
+                        </h3>
+                        <div id="detail-copy-container">
+                            <!-- Copy Button inserted here -->
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                                <tr>
+                                    <th class="px-6 py-3">Tracking ID (TNO)</th>
+                                    <th class="px-6 py-3">New Status</th>
+                                    <th class="px-6 py-3">Old Status (Base)</th>
+                                    <th class="px-6 py-3">Route ID</th>
+                                    <th class="px-6 py-3">Address</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detail-table-body" class="divide-y divide-slate-100">
+                                <!-- JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Section 2: After 200 Analysis -->
-        <div class="border rounded-lg shadow-md overflow-hidden">
-            <div id="header-after-200" class="collapse-header p-4 bg-gray-100 text-xl font-semibold text-gray-800 flex justify-between items-center">
-                <span>2. After 200 Analysis (All other Statuses exclude 255)</span>
-                <span class="transform transition-transform duration-300 rotate-180" id="icon-after-200">▼</span>
-            </div>
-            <div id="content-after-200" class="p-4 border-t" style="display: none;">
-                <!-- Pivot Table: Driver ID (Primary Pivot) -->
-                <h3 class="text-lg font-bold mb-3 text-indigo-600">Count of TNO by Driver ID at Inactivity
-                    <span id="selected-driver" class="text-sm font-normal text-gray-500 italic ml-2"></span>
-                </h3>
-                <div class="pivot-table-container border rounded-md mb-6">
-                    <table id="pivot-table-after-200-driver" class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50 sticky top-0">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Driver ID (Route #)</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TNO Count</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="2" class="px-6 py-4 text-center text-gray-500">No data loaded.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Visualization Section for After 200 -->
-                <h3 class="text-lg font-bold mb-3 mt-6 text-indigo-600" id="chart-title">TNO Count Distribution (All Drivers)</h3>
-                <div class="bg-gray-50 p-4 rounded-lg shadow-inner">
-                    <canvas id="driver-chart" width="400" height="200"></canvas>
-                </div>
-
-                <!-- TNO Copy Section -->
-                <h3 class="text-lg font-bold mb-3 mt-6 text-indigo-600">TNO List (Batch Copy)</h3>
-                <div class="copy-btn-group flex flex-wrap gap-3 mb-4" id="copy-buttons-after-200">
-                    <!-- Copy buttons generated here -->
-                </div>
-                <div id="tno-list-after-200" class="tno-list text-gray-600">
-                    <span class="text-xs italic">TNOs will appear here after filtering.</span>
-                </div>
-            </div>
-        </div>
-    </div>
+    </main>
     
-    <footer class="mt-8 pt-4 border-t text-center text-gray-500 text-sm">
+    <!-- Footer -->
+    <div class="fixed bottom-2 right-4 text-xs text-slate-400 font-medium pointer-events-none z-50">
         Created by Peter C.
-    </footer>
-</div>
+    </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const fileInput = document.getElementById('excelFile');
-        const statusEl = document.getElementById('processing-status');
-        const outputContainer = document.getElementById('output-container');
-        const whsFilter = document.getElementById('whs-filter');
-        const referenceDateInput = document.getElementById('reference-date'); // New reference date input
+    <script>
+        // --- Configuration & Constants ---
+        // Removed 'Address' from required base headers as it comes from Step 2
+        const REQUIRED_BASE_HEADERS = ['TNO', 'Dest. WHS', 'Route ID', 'A-Scan WHS', 'Status at Inactivity', 'Inactivity Time (UTC)'];
+        const VALID_WHS = ['SEA', 'PDX', 'BOI', 'GEG', 'EUG', 'MSO'];
+        const ROUTE_OFFSET = 270000;
         
-        // Chart variable to be globally accessible in this scope for updates
-        let driverChartInstance = null; 
+        // Past 200 Column Config
+        const P200_COL_TRACKING = 2; // Column C
+        const P200_COL_DRIVER = 18;  // Column S
 
-        let globalRawData = []; // Stores the primary filtered data (only valid Dest. WHS)
-        let currentBefore200Data = []; // Data for section 1 filtered by Dest WHS
-        let currentAfter200Data = [];  // Data for section 2 filtered by Dest WHS
+        // --- State Management ---
+        let state = {
+            baseData: [],       
+            baseDataMap: null,  
+            mergedData: [],     
+            
+            // Filters
+            activeDestWhs: 'ALL', 
+            activeAScanWhs: null, 
+            
+            // Toggles
+            show195: true,
+            show199: true,
+            excludeExceptions: false, // 203, 230, 213
+            
+            // Time Filters S1
+            activeTimeLabelS1: 'All',
+            activeTimeRangeS1: {min: null, max: null},
+            
+            // Time Filters S2 (NEW)
+            activeTimeLabelS2: 'All',
+            activeTimeRangeS2: {min: null, max: null},
 
-        // Section 1 State
-        let activeTimeFilterData = []; // Data filtered by time range (e.g., 3-5 days ago)
-        let activeAscanWHS = 'ALL';
+            // Views
+            currentView: 'dashboard',
+            selectedDriverData: null
+        };
 
-        // Section 2 State (Simplified: only need activeDriverID)
-        let activeDriverID = 'ALL';
+        // --- DOM Elements ---
+        const els = {
+            loader: document.getElementById('loading-overlay'),
+            loadText: document.getElementById('loading-text'),
+            
+            // Views
+            dashboardView: document.getElementById('dashboard-view'),
+            driverDetailView: document.getElementById('driver-detail-view'),
 
-        const REQUIRED_HEADERS = [
-            'TNO', 'Dest. WHS', 'Route ID', 'A-Scan WHS',
-            'Inactivity Time (UTC)', 'Status at Inactivity', 'Driver ID at Inactivity'
-        ];
-        const VALID_WH_CODES = ['SEA', 'PDX', 'BOI', 'GEG', 'EUG', 'MSO'];
-        const TNO_BATCH_SIZE = 400;
+            // Uploads
+            step1Status: document.getElementById('status-step1'),
+            step2Container: document.getElementById('step2-container'),
+            step2Status: document.getElementById('status-step2'),
+            
+            // Controls
+            whsSelect: document.getElementById('whs-filter'),
+            refDate: document.getElementById('reference-date'),
+            driverSearch: document.getElementById('driver-search'),
+            
+            // New Toggles
+            toggle195: document.getElementById('toggle-195'),
+            toggle199: document.getElementById('toggle-199'),
+            toggleExclude: document.getElementById('toggle-exclude-exceptions'),
 
-        // Constant for calculating the derived route number
-        const ROUTE_ID_OFFSET = 270000;
-        
-        // Initialize reference date to today's date
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months start at 0
-        const dd = String(today.getDate()).padStart(2, '0');
-        referenceDateInput.value = `${yyyy}-${mm}-${dd}`;
-        referenceDateInput.addEventListener('change', () => setupTimeFilters(currentBefore200Data));
+            // New Section: Base Moved
+            baseMovedSection: document.getElementById('base-moved-section'),
+            baseMovedCount: document.getElementById('base-moved-count'),
+            copyBaseMoved: document.getElementById('copy-base-moved'),
 
-        /**
-         * Helper function to convert Excel date serial number to a JavaScript Date object.
-         * Now handles string dates (like from CSV) or numeric Excel serial dates.
-         */
-        function parseExcelDate(value) {
-            if (typeof value === 'number' && value > 1) {
-                // Logic for Excel numeric serial (days since 1/1/1900)
-                const utc_days  = Math.floor(value - 25569);
-                const utc_value = utc_days * 86400;
-                const date_info = new Date(utc_value * 1000);
-                return date_info;
-            }
-            if (typeof value === 'string') {
-                // Logic for string date/time (like from CSV: YYYY-MM-DD HH:MM:SS)
-                // We assume the input string is in UTC as per the header name 'Inactivity Time (UTC)'.
-                // Replace space with 'T' and append 'Z' to force UTC interpretation, which is robust.
-                const dateString = value.replace(' ', 'T') + 'Z';
-                const date = new Date(dateString);
-                if (!isNaN(date.getTime())) return date;
-            }
-            return null;
-        }
+            // Section 1
+            ascanGrid: document.getElementById('ascan-grid'),
+            copyS1: document.getElementById('copy-s1'),
+            s1Count: document.getElementById('s1-count'),
+            s1Title: document.getElementById('s1-copy-title'),
+            timeFiltersS1: document.getElementById('time-filters-s1'), // Renamed
+            
+            // Section 2
+            driverSection: document.getElementById('driver-section'),
+            driverTableBody: document.getElementById('driver-table-body'),
+            timeFiltersS2: document.getElementById('time-filters-s2'), // NEW
 
-        /**
-         * Initializes the Destination Warehouse filter dropdown with options.
-         */
-        function initializeWHSFilter() {
-             whsFilter.innerHTML = '';
-             let allOption = document.createElement('option');
-             allOption.value = 'ALL';
-             allOption.textContent = 'All Valid Warehouses';
-             whsFilter.appendChild(allOption);
+            // Detail View
+            detailDriverId: document.getElementById('detail-driver-id'),
+            detailMeta: document.getElementById('detail-driver-meta'),
+            detailVol: document.getElementById('detail-total-vol'),
+            detailBody: document.getElementById('detail-table-body'),
+            detailCopy: document.getElementById('detail-copy-container')
+        };
 
-             VALID_WH_CODES.forEach(whs => {
-                 let option = document.createElement('option');
-                 option.value = whs;
-                 option.textContent = whs;
-                 whsFilter.appendChild(option);
-             });
-
-             whsFilter.removeEventListener('change', runAnalysis);
-             whsFilter.addEventListener('change', runAnalysis);
-        }
-
-        /**
-         * Parses the uploaded Excel/CSV file and applies the primary filtering.
-         */
-        function processFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            statusEl.classList.remove('hidden');
-            outputContainer.classList.add('hidden');
-            const reader = new FileReader();
-
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    // Use type: 'array' which works for both XLSX and CSV/delimited files
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
-
-                    // Convert to JSON array, using the header row for key names
-                    const jsonRows = XLSX.utils.sheet_to_json(worksheet);
-
-                    if (jsonRows.length === 0) throw new Error("The sheet is empty.");
-
-                    // Check for required headers using the keys from the first row object
-                    const actualHeaders = Object.keys(jsonRows[0] || {});
-                    if (!REQUIRED_HEADERS.every(h => actualHeaders.includes(h))) {
-                        throw new Error(`Missing required headers. Check for: ${REQUIRED_HEADERS.join(', ')}`);
-                    }
-
-                    const rawData = [];
-                    jsonRows.forEach(row => {
-                        const destWHS = row['Dest. WHS'];
-                        // 1. Primary Filter: Dest. WHS
-                        if (VALID_WH_CODES.includes(destWHS)) {
-                            const rowData = {};
-                            REQUIRED_HEADERS.forEach(header => {
-                                let value = row[header];
-
-                                if (header === 'Inactivity Time (UTC)') {
-                                    // Robust date parsing for both Excel serial and string formats
-                                    rowData[header] = parseExcelDate(value);
-                                } else if (header === 'Status at Inactivity' && value !== undefined) {
-                                    // Ensure status is treated as an integer
-                                    rowData[header] = parseInt(value, 10);
-                                } else {
-                                    rowData[header] = value;
-                                }
-                            });
-                            // Store only the filtered and parsed data
-                            rowData['Dest. WHS'] = destWHS; 
-                            rawData.push(rowData);
-                        }
-                    });
-
-                    globalRawData = rawData;
-                    initializeWHSFilter();
-                    runAnalysis();
-
-                } catch (error) {
-                    console.error("File processing error:", error);
-                    statusEl.textContent = `Error: ${error.message}. Please check your file format and column names.`;
-                    statusEl.classList.add('text-red-600');
-                }
-            };
-
-            reader.readAsArrayBuffer(file);
-        }
-
-        /**
-         * Runs both analyses based on the selected Destination Warehouse.
-         */
-        function runAnalysis() {
-            statusEl.classList.add('hidden');
-            statusEl.classList.remove('text-red-600');
-            outputContainer.classList.remove('hidden');
-
-            const selectedWHS = whsFilter.value;
-
-            const filteredByWHS = globalRawData.filter(row => {
-                if (selectedWHS === 'ALL') {
-                    return true;
-                }
-                return row['Dest. WHS'] === selectedWHS;
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Icons
+            lucide.createIcons();
+            
+            // Set default date
+            els.refDate.valueAsDate = new Date();
+            
+            // Listeners
+            document.getElementById('file1').addEventListener('change', handleBaseFileUpload);
+            document.getElementById('file2').addEventListener('change', handleDriverFileUploads);
+            
+            els.whsSelect.addEventListener('change', (e) => {
+                state.activeDestWhs = e.target.value;
+                state.activeAScanWhs = null;
+                runAnalysis();
+            });
+            
+            // FIX 1: Reference Date change listener now triggers analysis
+            els.refDate.addEventListener('change', () => runAnalysis()); 
+            
+            els.driverSearch.addEventListener('input', (e) => {
+                renderDriverTable(e.target.value);
             });
 
-            // Reset Section 1 state
-            currentBefore200Data = filteredByWHS.filter(row =>
-                row['Status at Inactivity'] === 195 || row['Status at Inactivity'] === 199
-            );
-            activeAscanWHS = 'ALL';
-            setupTimeFilters(currentBefore200Data); // This will call updateSection1Analysis internally
-
-            // Reset Section 2 state
-            currentAfter200Data = filteredByWHS.filter(row =>
-                row['Status at Inactivity'] !== 195 && row['Status at Inactivity'] !== 199 && row['Status at Inactivity'] !== 255
-            );
-            activeDriverID = 'ALL';
-            updateSection2Analysis(currentAfter200Data); // Now pivots by Driver ID
-        }
-
-        // --- SECTION 1 LOGIC (Before 200) ---
-
+            // Toggle Listeners
+            els.toggle195.addEventListener('change', (e) => {
+                state.show195 = e.target.checked;
+                runAnalysis();
+            });
+            els.toggle199.addEventListener('change', (e) => {
+                state.show199 = e.target.checked;
+                runAnalysis();
+            });
+            els.toggleExclude.addEventListener('change', (e) => {
+                state.excludeExceptions = e.target.checked;
+                runAnalysis();
+            });
+            
+            // Initialize time filter buttons
+            createTimeFilterButtons(els.timeFiltersS1, 'S1');
+            createTimeFilterButtons(els.timeFiltersS2, 'S2');
+        });
+        
         /**
-         * Sets up the date range filter buttons for the "Before 200" section.
+         * Creates the time filter buttons and sets up their click handlers.
+         * @param {HTMLElement} container - The DOM element to attach buttons to.
+         * @param {string} section - 'S1' or 'S2' to determine which state variables to update.
          */
-        function setupTimeFilters(data) {
-            const filterContainer = document.getElementById('date-filters-before-200');
-            filterContainer.innerHTML = '';
-            
-            const oneDayMs = 24 * 60 * 60 * 1000;
-            
-            // Get the reference date from the input field
-            const refDateString = referenceDateInput.value;
-            let referenceDate;
-            
-            if (refDateString) {
-                // Parse date string (YYYY-MM-DD) as UTC midnight for consistency
-                referenceDate = new Date(refDateString + 'T00:00:00Z');
-                if (isNaN(referenceDate.getTime())) {
-                     // Fallback if parsing fails
-                    referenceDate = new Date();
-                }
-            } else {
-                referenceDate = new Date();
-            }
-            const refTime = referenceDate.getTime();
-            
-            // Define Time Ranges relative to the midnight of the selected date (refTime)
-            const timeRanges = [
-                // (Ref Day - 6 days) < time <= (Ref Day - 3 days)
-                { label: "3-5 Days Ago", min: refTime - (6 * oneDayMs), max: refTime - (3 * oneDayMs) },
-                // (Ref Day - 8 days) < time <= (Ref Day - 6 days)
-                { label: "6-7 Days Ago", min: refTime - (8 * oneDayMs), max: refTime - (6 * oneDayMs) },
-                // (Ref Day - 15 days) < time <= (Ref Day - 7 days)
-                { label: "7-14 Days Ago", min: refTime - (15 * oneDayMs), max: refTime - (7 * oneDayMs) }
+        function createTimeFilterButtons(container, section) {
+            if (container.children.length > 0) return; // Prevent re-initialization
+
+            const filterOptions = [
+                { label: "All", min: null, max: null },
+                { label: "3-5 Days", min: 3, max: 6 },
+                { label: "6-7 Days", min: 6, max: 8 },
+                { label: "7-14 Days", min: 7, max: 15 }
             ];
 
-            const handleTimeFilter = (filterData, button) => {
-                activeTimeFilterData = filterData;
-                activeAscanWHS = 'ALL'; // Reset A-Scan filter on time change
-                updateSection1Analysis(activeTimeFilterData);
-                setActiveButton(button, filterContainer.id);
-            };
-
-            // Calculate 'All Data' filter button
-            const allBtn = createFilterButton("All Data", () => handleTimeFilter(data, allBtn), true);
-            filterContainer.appendChild(allBtn);
-
-            timeRanges.forEach(range => {
-                const btn = createFilterButton(range.label, () => {
-                    const filtered = data.filter(row => {
-                        const rowDate = row['Inactivity Time (UTC)'];
-                        if (!rowDate) return false;
-                        const time = rowDate.getTime();
-                        // Filter: (Older boundary) < time <= (Newer boundary)
-                        return time > range.min && time <= range.max;
+            filterOptions.forEach(option => {
+                const btn = document.createElement('button');
+                
+                const isActive = (section === 'S1' ? state.activeTimeLabelS1 : state.activeTimeLabelS2) === option.label;
+                
+                btn.className = "px-3 py-1 rounded-full text-xs font-medium transition-colors " + 
+                    (isActive ? "bg-indigo-600 text-white shadow-sm" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50");
+                
+                btn.textContent = option.label;
+                
+                btn.onclick = () => {
+                    // Update State
+                    if (section === 'S1') {
+                        state.activeTimeLabelS1 = option.label;
+                        state.activeTimeRangeS1 = {min: option.min, max: option.max};
+                    } else {
+                        state.activeTimeLabelS2 = option.label;
+                        state.activeTimeRangeS2 = {min: option.min, max: option.max};
+                    }
+                    
+                    // Update Visuals
+                    Array.from(container.children).forEach(b => {
+                        b.className = "px-3 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600 hover:bg-slate-50";
                     });
-                    handleTimeFilter(filtered, btn);
-                });
-                filterContainer.appendChild(btn);
-            });
-
-            // Initial run sets activeTimeFilterData to 'All Data'
-            activeTimeFilterData = data;
-            updateSection1Analysis(activeTimeFilterData);
-        }
-
-        /**
-         * Updates the pivot table and TNO list for Section 1, respecting A-Scan WHS filter.
-         */
-        function updateSection1Analysis(data) {
-            const pivotTableBody = document.querySelector(`#pivot-table-before-200 tbody`);
-            const pivotKey = 'A-Scan WHS';
-            const selectedAscanEl = document.getElementById('selected-ascan');
-
-            // 1. Apply A-Scan WHS Filter
-            const finalData = data.filter(row =>
-                activeAscanWHS === 'ALL' || row[pivotKey] === activeAscanWHS
-            );
-
-            // 2. Update Pivot Table (Always based on the currently time-filtered data, not A-Scan filtered)
-            const pivot = data.reduce((acc, row) => {
-                const key = row[pivotKey] || 'N/A';
-                acc[key] = (acc[key] || 0) + 1;
-                return acc;
-            }, {});
-
-            pivotTableBody.innerHTML = '';
-            const sortedPivotKeys = Object.keys(pivot).sort((a, b) => pivot[b] - pivot[a]);
-            
-            if (sortedPivotKeys.length > 0) {
-                sortedPivotKeys.forEach(key => {
-                    const row = pivotTableBody.insertRow();
-                    row.className = `clickable-row ${key === activeAscanWHS ? 'selected-row' : ''}`;
-                    row.setAttribute('data-key', key);
+                    btn.className = "px-3 py-1 rounded-full text-xs font-medium bg-indigo-600 text-white shadow-sm";
                     
-                    row.onclick = function() {
-                        // Toggle selection
-                        activeAscanWHS = (activeAscanWHS === key) ? 'ALL' : key;
-                        updateSection1Analysis(activeTimeFilterData); // Re-run analysis with new filter
-                    };
-
-                    row.insertCell().textContent = key;
-                    row.insertCell().textContent = pivot[key].toLocaleString();
-                });
-            } else {
-                pivotTableBody.innerHTML = `<tr><td colspan="2" class="px-6 py-4 text-center text-gray-500">No matching TNOs found.</td></tr>`;
-            }
-            
-            // Update A-Scan Filter Display
-            selectedAscanEl.textContent = activeAscanWHS !== 'ALL' ? `(Filtered by: ${activeAscanWHS})` : '(All A-Scan WHS)';
-
-            // 3. Update TNO List and Copy Buttons (based on finalData)
-            updateTnoCopySection(finalData, 'before-200');
-        }
-
-        // --- SECTION 2 LOGIC (After 200) ---
-
-        /**
-         * Calculates the derived route number.
-         */
-        function getDerivedRoute(routeId) {
-            // Ensure routeId is a number before subtraction
-            const route = parseInt(routeId, 10); 
-            if (isNaN(route) || route < ROUTE_ID_OFFSET) return 'N/A';
-            return (route - ROUTE_ID_OFFSET).toString();
-        }
-        
-        /**
-         * Generates the pivot structure (driver: {count, routeIds}) from a dataset.
-         */
-        function getPivotData(data) {
-             const driverKey = 'Driver ID at Inactivity';
-             const routeKey = 'Route ID';
-             
-             return data.reduce((acc, row) => {
-                 const driver = String(row[driverKey] || 'N/A'); // Coerce key to string
-                 const routeId = row[routeKey] || '0';
-                 
-                 if (!acc[driver]) {
-                     acc[driver] = { count: 0, routeIds: new Set() };
-                 }
-                 acc[driver].count += 1;
-                 acc[driver].routeIds.add(String(routeId)); // Store route ID as string
-                 
-                 return acc;
-             }, {});
-        }
-
-
-        /**
-         * Updates the primary pivot table (now Driver ID) for Section 2 and generates the chart data.
-         */
-        function updateSection2Analysis(data) {
-            const driverPivotTableBody = document.querySelector(`#pivot-table-after-200-driver tbody`);
-            const driverKey = 'Driver ID at Inactivity';
-            const routeKey = 'Route ID';
-            const selectedDriverEl = document.getElementById('selected-driver');
-            const chartTitleEl = document.getElementById('chart-title');
-
-            // 1. Determine the dataset for the final TNO list: Filter the base data by activeDriverID
-            let finalTnoData = data.filter(row => {
-                const rowDriverId = String(row[driverKey] || '');
-                const activeFilter = String(activeDriverID);
-                
-                return activeFilter === 'ALL' || rowDriverId === activeFilter;
-            });
-
-            // 2. Create Primary Pivot (for the TABLE) using the full unfiltered data (data) 
-            const mainPivot = getPivotData(data);
-            
-            // 3. Determine Chart Data (Peer Group Analysis)
-            let chartLabels = [];
-            let chartDataValues = [];
-            let chartTitle = 'TNO Count Distribution (All Drivers)';
-            let chartActiveKey = 'NONE';
-            
-            if (activeDriverID !== 'ALL' && mainPivot[activeDriverID]) {
-                const selectedDriverRoutes = mainPivot[activeDriverID].routeIds;
-                
-                // Filter the base data to include ALL TNOs on any of the selected driver's routes
-                const chartDataPool = data.filter(row => {
-                    return selectedDriverRoutes.has(String(row[routeKey]));
-                });
-                
-                // Recalculate pivot for the chart (peer group)
-                const chartPivot = getPivotData(chartDataPool);
-                
-                // Prepare chart data from the peer group pivot
-                const chartKeys = Object.keys(chartPivot).sort((a, b) => chartPivot[b].count - chartPivot[a].count);
-                
-                const derivedRouteNames = Array.from(selectedDriverRoutes)
-                                              .map(getDerivedRoute)
-                                              .filter(r => r !== 'N/A')
-                                              .sort((a, b) => parseInt(a) - parseInt(b));
-                
-                chartTitle = `TNO Count for Drivers on Route(s): ${derivedRouteNames.join(', ')}`;
-                chartActiveKey = activeDriverID;
-                
-                chartKeys.forEach(key => {
-                    chartLabels.push(key);
-                    chartDataValues.push(chartPivot[key].count);
-                });
-            } else {
-                // If ALL is selected, chart shows all drivers from the main pivot
-                const chartKeys = Object.keys(mainPivot).sort((a, b) => mainPivot[b].count - mainPivot[a].count);
-                chartKeys.forEach(key => {
-                    chartLabels.push(key);
-                    chartDataValues.push(mainPivot[key].count);
-                });
-            }
-
-
-            // 4. Update Pivot Table (Table remains based on the main pivot)
-            driverPivotTableBody.innerHTML = '';
-            const sortedDriverKeys = Object.keys(mainPivot).sort((a, b) => mainPivot[b].count - mainPivot[a].count);
-
-            if (sortedDriverKeys.length > 0) {
-                // Add 'All Drivers' row for easy filter clearing
-                const allDriversRow = driverPivotTableBody.insertRow();
-                allDriversRow.className = `clickable-row ${activeDriverID === 'ALL' ? 'selected-row' : ''}`;
-                allDriversRow.onclick = function() {
-                    activeDriverID = 'ALL';
-                    updateSection2Analysis(currentAfter200Data);
+                    runAnalysis();
                 };
-                allDriversRow.insertCell().textContent = 'ALL DRIVERS (Click to clear filter)';
-                allDriversRow.insertCell().textContent = data.length.toLocaleString();
-
-                sortedDriverKeys.forEach(key => {
-                    const item = mainPivot[key];
-                    
-                    // Display the routes (e.g., "13, 14, ...")
-                    const derivedRoutes = Array.from(item.routeIds)
-                                               .map(getDerivedRoute)
-                                               .filter(r => r !== 'N/A')
-                                               .sort((a, b) => parseInt(a) - parseInt(b));
-                    const routeDisplay = derivedRoutes.join(', ');
-                    
-                    const row = driverPivotTableBody.insertRow();
-                    row.className = `clickable-row ${key === activeDriverID ? 'selected-row' : ''}`;
-                    row.setAttribute('data-key', key);
-
-                    row.onclick = function() {
-                        // Toggle selection
-                        activeDriverID = (activeDriverID === key) ? 'ALL' : key;
-                        // Passing the base data to recalculate the view with the new filter
-                        updateSection2Analysis(currentAfter200Data); 
-                    };
-
-                    // Display Driver ID and Derived Routes
-                    const routeText = routeDisplay ? ` (Routes: ${routeDisplay})` : '';
-                    row.insertCell().innerHTML = `${key}<span class="text-xs font-normal text-gray-500">${routeText}</span>`;
-                    row.insertCell().textContent = item.count.toLocaleString();
-                });
-            } else {
-                driverPivotTableBody.innerHTML = `<tr><td colspan="2" class="px-6 py-4 text-center text-gray-500">No matching TNOs found.</td></tr>`;
-            }
-
-            // 5. Render Chart and Update Filter Display
-            chartTitleEl.textContent = chartTitle;
-            renderDriverChart(chartLabels, chartDataValues, chartActiveKey);
-            selectedDriverEl.textContent = activeDriverID !== 'ALL' ? `(Filtered by: ${activeDriverID})` : '(All Drivers)';
-
-            // 6. Update TNO List and Copy Buttons (based on the final TNO data)
-            updateTnoCopySection(finalTnoData, 'after-200');
+                container.appendChild(btn);
+            });
         }
-        
-        /**
-         * Renders or updates the Chart.js bar chart for the Driver ID pivot data.
-         * Highlights the activeDriverKey.
-         */
-        function renderDriverChart(labels, data, activeDriverKey) {
-            const ctx = document.getElementById('driver-chart').getContext('2d');
+
+        // --- View Switching ---
+        function switchView(viewName) {
+            state.currentView = viewName;
+            if(viewName === 'dashboard') {
+                els.dashboardView.classList.remove('hidden');
+                els.driverDetailView.classList.add('hidden');
+                setTimeout(() => lucide.createIcons(), 50);
+            } else if(viewName === 'detail') {
+                els.dashboardView.classList.add('hidden');
+                els.driverDetailView.classList.remove('hidden');
+                setTimeout(() => lucide.createIcons(), 50);
+            }
+        }
+
+        // --- Step 1: Base File Processing ---
+        function handleBaseFileUpload(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+
+            // Feedback: Update status text immediately
+            els.step1Status.textContent = "Processing Base File...";
+            els.step1Status.className = "mt-3 text-xs font-bold text-indigo-500 animate-pulse";
+
+            // Wrap in setTimeout to allow UI repaint (FIX 2)
+            setTimeout(() => {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    try {
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                        
+                        if(!json.length) throw new Error("File empty");
+                        const keys = Object.keys(json[0]);
+                        
+                        // Check headers
+                        const missing = REQUIRED_BASE_HEADERS.filter(h => !keys.includes(h));
+                        if(missing.length) throw new Error(`Missing headers: ${missing.join(', ')}`);
+
+                        // Parse Data
+                        state.baseData = json.filter(row => VALID_WHS.includes(row['Dest. WHS'])).map(row => {
+                            let dateObj = null;
+                            const rawDate = row['Inactivity Time (UTC)'];
+                            if(typeof rawDate === 'number') dateObj = new Date((rawDate - 25569) * 86400 * 1000);
+                            else if(typeof rawDate === 'string') dateObj = new Date(rawDate.replace(' ', 'T') + 'Z');
+
+                            return {
+                                ...row,
+                                _normalizedDate: dateObj,
+                                _tno: String(row['TNO']).trim(),
+                                _status: parseInt(row['Status at Inactivity']) || 0
+                            };
+                        });
+
+                        state.baseDataMap = new Map();
+                        state.baseData.forEach(row => state.baseDataMap.set(row._tno, row));
+
+                        // UI Updates
+                        els.step1Status.textContent = `Success: ${state.baseData.length} records loaded.`;
+                        els.step1Status.className = "mt-3 text-xs font-bold text-emerald-600";
+                        els.step2Container.classList.remove('opacity-50', 'pointer-events-none');
+                        
+                        populateWHSFilter();
+                        
+                        state.mergedData = [];
+                        state.activeAScanWhs = null;
+                        
+                        els.dashboardView.classList.remove('hidden');
+                        document.getElementById('system-status').textContent = "Base Data Loaded";
+                        
+                        runAnalysis();
+
+                    } catch(err) {
+                        alert("Error: " + err.message);
+                        els.step1Status.textContent = "Error loading file.";
+                        els.step1Status.className = "mt-3 text-xs font-bold text-red-500";
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }, 50); // Small delay to render UI
+        }
+
+        // --- Step 2: Driver Files Processing ---
+        async function handleDriverFileUploads(e) {
+            const files = e.target.files;
+            if(!files.length) return;
+
+            // Feedback: Update status text immediately
+            els.step2Status.textContent = "Processing files...";
+            els.step2Status.className = "mt-3 text-xs font-bold text-blue-500 animate-pulse";
+
+            // Use setTimeout for UI responsiveness
+            setTimeout(async () => {
+                showLoading(true, `Processing ${files.length} Driver Files...`);
+                let rawDriverData = [];
+                
+                try {
+                    for(let file of files) {
+                        await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = (evt) => {
+                                const wb = XLSX.read(evt.target.result, {type: 'binary'});
+                                const sheet = wb.Sheets[wb.SheetNames[0]];
+                                const headers = XLSX.utils.sheet_to_json(sheet, {header:1})[0] || [];
+                                
+                                let statusIdx = -1;
+                                const statusKeywords = ['status', 'event_code', 'scanned_status', 'latest status'];
+                                let addressIdx = -1;
+                                const addressKeywords = ['address', 'street', 'dest', 'location', 'consignee'];
+                                
+                                headers.forEach((h, idx) => {
+                                    if(h && typeof h === 'string') {
+                                        const hLower = h.toLowerCase();
+                                        if(statusKeywords.some(kw => hLower.includes(kw))) statusIdx = idx;
+                                        if(addressKeywords.some(kw => hLower.includes(kw))) addressIdx = idx;
+                                    }
+                                });
+
+                                const data = XLSX.utils.sheet_to_json(sheet, {header:1});
+                                if(data.length > 1) {
+                                    const rows = data.slice(1).map(r => ({
+                                        tno: r[P200_COL_TRACKING],
+                                        driver: r[P200_COL_DRIVER],
+                                        newStatus: statusIdx > -1 ? r[statusIdx] : undefined,
+                                        address: addressIdx > -1 ? r[addressIdx] : undefined
+                                    }));
+                                    rawDriverData.push(...rows);
+                                }
+                                resolve();
+                            };
+                            reader.readAsBinaryString(file);
+                        });
+                    }
+
+                    // MERGE LOGIC
+                    state.mergedData = [];
+                    let matchedCount = 0;
+                    let movedCount = 0;
+
+                    rawDriverData.forEach(row => {
+                        const tno = String(row.tno || '').trim();
+                        const driverId = String(row.driver || 'N/A').trim();
+                        
+                        let newStatCode = 0;
+                        if(row.newStatus) {
+                            const match = String(row.newStatus).match(/^\d+/);
+                            if(match) newStatCode = parseInt(match[0]);
+                            else if(!isNaN(row.newStatus)) newStatCode = parseInt(row.newStatus);
+                        }
+
+                        if(tno && state.baseDataMap && state.baseDataMap.has(tno)) {
+                            const baseRow = state.baseDataMap.get(tno);
+                            
+                            state.mergedData.push({
+                                tno: tno,
+                                destWhs: baseRow['Dest. WHS'],
+                                routeId: baseRow['Route ID'],
+                                driverId: driverId,
+                                baseStatus: baseRow._status, 
+                                newStatus: newStatCode,
+                                aScan: baseRow['A-Scan WHS'],
+                                inactivityTime: baseRow['Inactivity Time (UTC)'],
+                                _normalizedDate: baseRow._normalizedDate,
+                                address: row.address || 'N/A'
+                            });
+                            matchedCount++;
+                            if(newStatCode > 0) movedCount++;
+                        }
+                    });
+
+                    els.step2Status.innerHTML = `Processed. Matched ${matchedCount} TNOs.<br>Detected Status for ${movedCount} items.`;
+                    els.step2Status.className = "mt-3 text-xs font-bold text-blue-600";
+                    document.getElementById('system-status').textContent = "Update Analysis Complete";
+                    
+                    runAnalysis();
+
+                } catch(err) {
+                    console.error(err);
+                    alert("Error reading driver files.");
+                    els.step2Status.textContent = "Error processing files.";
+                    els.step2Status.className = "mt-3 text-xs font-bold text-red-500";
+                } finally {
+                    showLoading(false);
+                }
+            }, 50);
+        }
+
+        // --- Core Analysis Logic ---
+        function runAnalysis() {
+            if(!state.baseData.length) return;
+
+            const refDate = new Date(els.refDate.value + 'T00:00:00Z');
+            const msDay = 86400000;
             
-            // Determine bar colors (highlighting the active driver)
-            const backgroundColors = labels.map(label => 
-                label === activeDriverKey 
-                    ? 'rgba(79, 70, 229, 1.0)' // Solid Indigo for selected driver
-                    : 'rgba(59, 130, 246, 0.7)' // Blue for others (peer group)
-            );
-            
-            // Destroy the old chart instance if it exists
-            if (driverChartInstance) {
-                driverChartInstance.destroy();
+            // --- 0. Pre-Check: Base File Already Moved ---
+            if (state.mergedData.length > 0) {
+                els.baseMovedSection.classList.add('hidden');
+            } else {
+                const movedBase = state.baseData.filter(row => {
+                    const whsMatch = state.activeDestWhs === 'ALL' || row['Dest. WHS'] === state.activeDestWhs;
+                    const statusCheck = row._status > 200 && row._status !== 255;
+                    return whsMatch && statusCheck;
+                });
+                renderBaseMoved(movedBase);
             }
 
-            driverChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'TNO Count',
-                        data: data,
-                        backgroundColor: backgroundColors, 
-                        borderColor: 'rgba(59, 130, 246, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false, // Allows chart to scale correctly within the container
-                    indexAxis: 'y', // Horizontal bars for better readability with long labels
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'TNO Count'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                // Limit number of ticks if there are too many drivers
-                                maxTicksLimit: 30, 
-                            },
-                            title: {
-                                display: true,
-                                text: 'Driver ID'
-                            }
+            // --- 1. Section 1: Inactivity (195/199) ---
+            const timeRangeS1 = state.activeTimeRangeS1;
+            const s1Base = state.baseData.filter(row => {
+                const whsMatch = state.activeDestWhs === 'ALL' || row['Dest. WHS'] === state.activeDestWhs;
+                
+                let statusMatch = false;
+                if(state.show195 && row._status === 195) statusMatch = true;
+                if(state.show199 && row._status === 199) statusMatch = true;
+                
+                let timeMatch = true;
+                if(timeRangeS1.min !== null && row._normalizedDate) {
+                    const t = row._normalizedDate.getTime();
+                    const minTime = refDate.getTime() - (timeRangeS1.max * msDay);
+                    const maxTime = refDate.getTime() - (timeRangeS1.min * msDay);
+                    timeMatch = t > minTime && t <= maxTime;
+                }
+                return whsMatch && statusMatch && timeMatch;
+            });
+            renderSection1(s1Base);
+
+            // --- 2. Section 2: Merged Driver Analysis ---
+            if(state.mergedData.length) {
+                els.driverSection.classList.remove('hidden');
+                
+                const timeRangeS2 = state.activeTimeRangeS2;
+                
+                const s2Base = state.mergedData.filter(row => {
+                    const whsMatch = state.activeDestWhs === 'ALL' || row.destWhs === state.activeDestWhs;
+                    
+                    // Time filter against original inactivity date
+                    let timeMatch = true;
+                    if(timeRangeS2.min !== null && row._normalizedDate) {
+                        const t = row._normalizedDate.getTime();
+                        const minTime = refDate.getTime() - (timeRangeS2.max * msDay);
+                        const maxTime = refDate.getTime() - (timeRangeS2.min * msDay);
+                        timeMatch = t > minTime && t <= maxTime;
+                    }
+                    
+                    const effectiveStatus = row.newStatus > 0 ? row.newStatus : row.baseStatus;
+                    const statusCheck = effectiveStatus > 200 && effectiveStatus !== 255;
+                    
+                    let exclusionPass = true;
+                    if(state.excludeExceptions) {
+                        if(effectiveStatus === 203 || effectiveStatus === 230 || effectiveStatus === 213) {
+                            exclusionPass = false;
                         }
                     }
-                }
-            });
-        }
 
-
-        // --- COMMON UTILITY FUNCTIONS ---
-
-        /**
-         * Generates the TNO list and batch copy buttons.
-         */
-        function updateTnoCopySection(data, sectionId) {
-            const tnos = data.map(row => row.TNO).filter(t => t);
-            const copyButtonsContainer = document.getElementById(`copy-buttons-${sectionId}`);
-            const tnoListEl = document.getElementById(`tno-list-${sectionId}`);
-
-            copyButtonsContainer.innerHTML = '';
-            const numBatches = Math.ceil(tnos.length / TNO_BATCH_SIZE);
-
-            if (tnos.length > 0) {
-                // Limit display to the first 400 for performance/readability
-                const displayedTnos = tnos.slice(0, 400);
-                tnoListEl.innerHTML = `${displayedTnos.join(', ')}${tnos.length > 400 ? '...' : ''}`;
+                    return whsMatch && statusCheck && exclusionPass && timeMatch;
+                });
                 
-                if (tnos.length > 400) {
-                     tnoListEl.innerHTML += `<br><span class="text-xs text-gray-400">(${tnos.length - 400} additional TNOs hidden in display, but available via copy buttons.)</span>`;
-                }
-
-
-                for (let i = 0; i < numBatches; i++) {
-                    const start = i * TNO_BATCH_SIZE;
-                    const end = Math.min((i + 1) * TNO_BATCH_SIZE, tnos.length);
-                    const button = document.createElement('button');
-                    button.textContent = `Copy TNOs (${start + 1}-${end})`;
-                    button.className = 'px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-full shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-                    button.onclick = () => copyTNOs(tnos.slice(start, end));
-                    copyButtonsContainer.appendChild(button);
-                }
+                processDriverData(s2Base);
             } else {
-                 tnoListEl.textContent = 'No TNOs available for copying based on current filters.';
+                els.driverSection.classList.add('hidden');
             }
         }
 
+        function renderBaseMoved(data) {
+            els.baseMovedCount.textContent = data.length;
+            
+            if(data.length > 0) {
+                els.baseMovedSection.classList.remove('hidden');
+                setupCopyButtons(data.map(r => r._tno), 'copy-base-moved', true);
+            } else {
+                els.baseMovedSection.classList.add('hidden');
+            }
+        }
 
-        /**
-         * Creates a standardized filter button.
-         */
-        function createFilterButton(label, handler, isActive = false) {
-            const button = document.createElement('button');
-            button.textContent = label;
-            button.className = `px-3 py-1 text-sm font-medium rounded-full transition-colors duration-150 ${
-                isActive ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700'
+        // --- SECTION 1 RENDER (A-Scan Cards) ---
+        function renderSection1(data) {
+            // Group by A-Scan WHS
+            const counts = {};
+            data.forEach(r => {
+                const k = r['A-Scan WHS'] || 'Unknown';
+                counts[k] = (counts[k] || 0) + 1;
+            });
+
+            els.ascanGrid.innerHTML = '';
+            
+            // "All" Card
+            const allCard = createAScanCard('ALL', data.length, state.activeAScanWhs === null);
+            allCard.onclick = () => { state.activeAScanWhs = null; runAnalysis(); };
+            els.ascanGrid.appendChild(allCard);
+
+            Object.entries(counts).sort((a,b) => b[1] - a[1]).forEach(([whs, count]) => {
+                const isActive = state.activeAScanWhs === whs;
+                const card = createAScanCard(whs, count, isActive);
+                card.onclick = () => { 
+                    state.activeAScanWhs = isActive ? null : whs; 
+                    runAnalysis(); 
+                };
+                els.ascanGrid.appendChild(card);
+            });
+
+            // Update Copy List
+            const finalCopyData = state.activeAScanWhs 
+                ? data.filter(r => (r['A-Scan WHS'] || 'Unknown') === state.activeAScanWhs)
+                : data;
+            
+            els.s1Count.textContent = `${finalCopyData.length} items`;
+            els.s1Title.textContent = state.activeAScanWhs 
+                ? `TNO Copy List (Filter: ${state.activeAScanWhs})`
+                : `TNO Copy List (All)`;
+                
+            setupCopyButtons(finalCopyData.map(r => r._tno), 'copy-s1');
+        }
+
+        function createAScanCard(title, count, isActive) {
+            const div = document.createElement('button');
+            div.className = `relative text-left p-4 rounded-xl border transition-all duration-200 group w-full ${
+                isActive 
+                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 scale-[1.02]' 
+                : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-md'
             }`;
-            button.onclick = handler;
-            return button;
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <div class="text-xs font-bold uppercase tracking-wider ${isActive ? 'text-indigo-200' : 'text-slate-500'}">${title === 'ALL' ? 'Total' : 'WHS'}</div>
+                    ${isActive ? '<i data-lucide="check-circle-2" class="w-4 h-4 text-white"></i>' : '<i data-lucide="map-pin" class="w-4 h-4 text-slate-300"></i>'}
+                </div>
+                <div class="text-lg font-bold truncate ${isActive ? 'text-white' : 'text-slate-900'}">${title}</div>
+                <div class="mt-2 text-2xl font-bold ${isActive ? 'text-white' : 'text-indigo-600'}">${count}</div>
+            `;
+            return div;
         }
 
-        /**
-         * Manages the visual state of the filter buttons.
-         */
-        function setActiveButton(activeButton, containerId) {
-            document.querySelectorAll(`#${containerId} button`).forEach(btn => {
-                btn.className = btn.className.replace('bg-indigo-600 text-white shadow-lg', 'bg-gray-200 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700');
+        // --- SECTION 2 RENDER (Drivers) ---
+        let cachedDriverData = []; 
+
+        function processDriverData(data) {
+            const drivers = {};
+            data.forEach(row => {
+                const d = row.driverId;
+                if(!drivers[d]) drivers[d] = { 
+                    id: d, 
+                    count: 0, 
+                    routes: new Set(), 
+                    whs: row.destWhs,
+                    packages: [] 
+                };
+                
+                drivers[d].count++;
+                drivers[d].packages.push(row);
+                
+                const rId = parseInt(row.routeId);
+                if(!isNaN(rId) && rId > ROUTE_OFFSET) drivers[d].routes.add(rId - ROUTE_OFFSET);
             });
-            activeButton.className = activeButton.className.replace('bg-gray-200 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700', 'bg-indigo-600 text-white shadow-lg');
+
+            cachedDriverData = Object.values(drivers).sort((a,b) => b.count - a.count);
+            renderDriverTable();
         }
 
-        /**
-         * Copies TNOs to the clipboard.
-         */
-        function copyTNOs(tnosArray) {
-            const tnoString = tnosArray.join('\n');
-            const textarea = document.createElement('textarea');
-            textarea.value = tnoString;
-            textarea.style.position = 'fixed';
-            document.body.appendChild(textarea);
-            textarea.select();
+        function renderDriverTable(searchTerm = "") {
+            els.driverTableBody.innerHTML = '';
+            
+            const term = searchTerm.toLowerCase();
+            const filtered = cachedDriverData.filter(d => 
+                d.id.toLowerCase().includes(term)
+            );
 
-            try {
-                document.execCommand('copy');
-                showMessage(`Copied ${tnosArray.length} TNOs to clipboard!`, 'success');
-            } catch (err) {
-                showMessage('Failed to copy TNOs.', 'error');
+            if(filtered.length === 0) {
+                els.driverTableBody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400">No matching drivers/packages found. <br><span class="text-xs">Try uploading more driver files or check Status columns.</span></td></tr>';
+                return;
             }
 
-            document.body.removeChild(textarea);
+            filtered.forEach(d => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors cursor-pointer group border-b border-slate-50";
+                tr.onclick = () => openDriverDetail(d);
+
+                const routeStr = Array.from(d.routes).sort((a,b)=>a-b).join(', ') || '-';
+                
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-mono text-blue-600 font-medium group-hover:underline">${d.id}</td>
+                    <td class="px-6 py-4 text-slate-600 text-xs max-w-xs truncate" title="${routeStr}">${routeStr}</td>
+                    <td class="px-6 py-4 text-slate-600">${d.whs || '-'}</td>
+                    <td class="px-6 py-4 text-right font-bold text-slate-900">${d.count}</td>
+                    <td class="px-6 py-4 text-right">
+                        <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors inline-block"></i>
+                    </td>
+                `;
+                els.driverTableBody.appendChild(tr);
+            });
+            
+            lucide.createIcons();
         }
 
-        /**
-         * Displays a temporary success/error message (replaces alert()).
-         */
-        function showMessage(message, type) {
-            let colorClass = type === 'success' ? 'bg-green-500' : 'bg-red-500';
-            const msgBox = document.createElement('div');
-            msgBox.id = 'temp-message';
-            msgBox.className = `fixed bottom-5 right-5 z-50 p-4 rounded-lg text-white font-semibold shadow-2xl transition-opacity duration-300 ${colorClass}`;
-            msgBox.textContent = message;
-            document.body.appendChild(msgBox);
+        // --- DRIVER DETAIL VIEW LOGIC ---
+        function openDriverDetail(driverData) {
+            state.selectedDriverData = driverData;
+            
+            // Header Info
+            els.detailDriverId.innerHTML = `<i data-lucide="truck" class="w-6 h-6 text-blue-600"></i> ${driverData.id}`;
+            
+            // Fix: Routes Display (Joined Route IDs)
+            const routeStr = Array.from(driverData.routes).sort((a,b)=>a-b).join(', ') || 'N/A';
+            els.detailMeta.innerHTML = `
+                <span class="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded text-slate-600"><i data-lucide="map-pin" class="w-3 h-3"></i> ${driverData.whs}</span>
+                <span class="flex items-center gap-1 text-slate-500 font-medium">Route ID: ${routeStr}</span>
+            `;
+            els.detailVol.textContent = driverData.count;
 
-            setTimeout(() => {
-                msgBox.style.opacity = '0';
-                setTimeout(() => msgBox.remove(), 300);
-            }, 3000);
+            const tnos = driverData.packages.map(p => p.tno);
+            els.detailCopy.innerHTML = '';
+            
+            const copyBtn = document.createElement('button');
+            copyBtn.className = "text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center gap-1";
+            copyBtn.innerHTML = `<i data-lucide="copy" class="w-4 h-4"></i> Copy TNOs`;
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(tnos.join('\n'));
+                copyBtn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> Copied!`;
+                setTimeout(() => copyBtn.innerHTML = `<i data-lucide="copy" class="w-4 h-4"></i> Copy TNOs`, 2000);
+            };
+            els.detailCopy.appendChild(copyBtn);
+
+            els.detailBody.innerHTML = '';
+            driverData.packages.forEach(pkg => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+                
+                const statusBadge = `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">${pkg.newStatus || '-'}</span>`;
+
+                // Replaced A-Scan WHS with Address in table
+                tr.innerHTML = `
+                    <td class="px-6 py-3 font-mono text-slate-700 text-xs font-medium">${pkg.tno}</td>
+                    <td class="px-6 py-3">${statusBadge}</td>
+                    <td class="px-6 py-3 text-slate-400 text-xs">${pkg.baseStatus}</td>
+                    <td class="px-6 py-3 text-slate-500 text-xs">${pkg.routeId}</td>
+                    <td class="px-6 py-3 text-slate-600 text-xs max-w-md truncate" title="${pkg.address}">${pkg.address}</td>
+                `;
+                els.detailBody.appendChild(tr);
+            });
+
+            switchView('detail');
         }
 
-        // --- Event Listeners and Initialization ---
-        fileInput.addEventListener('change', processFile);
-
-        // Collapse functionality
-        function setupCollapsible(headerId, contentId, iconId) {
-            const header = document.getElementById(headerId);
-            const content = document.getElementById(contentId);
-            const icon = document.getElementById(iconId);
-
-            header.addEventListener('click', () => {
-                const isHidden = content.style.display === 'none';
-                content.style.display = isHidden ? 'block' : 'none';
-                icon.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+        // --- Utilities ---
+        function populateWHSFilter() {
+            els.whsSelect.innerHTML = '<option value="ALL">All Regions</option>';
+            VALID_WHS.forEach(w => {
+                const opt = document.createElement('option');
+                opt.value = w;
+                opt.textContent = w;
+                els.whsSelect.appendChild(opt);
             });
         }
 
-        setupCollapsible('header-before-200', 'content-before-200', 'icon-before-200');
-        setupCollapsible('header-after-200', 'content-after-200', 'icon-after-200');
-    });
-</script>
+        function setupCopyButtons(tnos, containerId, isAmber = false) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
 
+            if(tnos.length === 0) {
+                container.innerHTML = '<span class="text-sm text-slate-400 italic">No items to copy.</span>';
+                return;
+            }
+
+            const batchSize = 400;
+            const batches = Math.ceil(tnos.length / batchSize);
+
+            for(let i=0; i<batches; i++) {
+                const start = i * batchSize;
+                const end = Math.min((i+1) * batchSize, tnos.length);
+                
+                const btn = document.createElement('button');
+                btn.textContent = `Copy ${start+1}-${end}`;
+                
+                if(isAmber) {
+                    btn.className = "px-3 py-1.5 bg-white border border-amber-200 text-amber-700 text-xs font-bold rounded shadow-sm hover:bg-amber-50 hover:border-amber-300 transition-colors";
+                } else {
+                    btn.className = "px-3 py-1.5 bg-white border border-slate-200 text-indigo-600 text-xs font-bold rounded shadow-sm hover:bg-indigo-50 hover:border-indigo-200 transition-colors";
+                }
+                
+                btn.onclick = () => {
+                    const text = tnos.slice(start, end).join('\n');
+                    navigator.clipboard.writeText(text).then(() => {
+                        btn.textContent = "Copied!";
+                        if(isAmber) {
+                            btn.className = "px-3 py-1.5 bg-emerald-500 text-white border border-emerald-600 text-xs font-bold rounded shadow-sm";
+                        } else {
+                            btn.className = "px-3 py-1.5 bg-emerald-500 text-white border border-emerald-600 text-xs font-bold rounded shadow-sm";
+                        }
+                        setTimeout(() => {
+                            btn.textContent = `Copy ${start+1}-${end}`;
+                            if(isAmber) {
+                                btn.className = "px-3 py-1.5 bg-white border border-amber-200 text-amber-700 text-xs font-bold rounded shadow-sm hover:bg-amber-50 hover:border-amber-300 transition-colors";
+                            } else {
+                                btn.className = "px-3 py-1.5 bg-white border border-slate-200 text-indigo-600 text-xs font-bold rounded shadow-sm hover:bg-indigo-50 hover:border-indigo-200 transition-colors";
+                            }
+                        }, 2000);
+                    });
+                };
+                container.appendChild(btn);
+            }
+        }
+
+        function showLoading(show, text="Processing...") {
+            els.loadText.textContent = text;
+            els.loader.classList.toggle('visible', show);
+        }
+
+        function resetAnalysis() {
+            location.reload();
+        }
+    </script>
 </body>
 </html>
