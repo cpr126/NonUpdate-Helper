@@ -52,7 +52,7 @@
             padding-right: 1rem;
         }
 
-        /* Adjust main layout spacing to account for the overall fixed header height (16h + 4rem) */
+        /* Adjust main layout spacing to account for the overall fixed header height (h-16) */
         main {
             padding-top: 0; /* Removing top padding on main to start content higher */
         }
@@ -136,6 +136,12 @@
                     <p class="text-xs text-slate-500">Filters apply to sections below.</p>
                 </div>
                 <div class="flex items-center gap-4">
+                    <!-- A-Scan Toggle (NEW) -->
+                    <label class="flex items-center gap-2 text-sm font-bold text-slate-600 cursor-pointer select-none bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+                        <input type="checkbox" id="toggle-ascan-section" checked class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"> 
+                        Show A-Scan
+                    </label>
+
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-medium text-slate-600">Reference Date:</label>
                         <input type="date" id="reference-date" class="text-sm border-slate-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
@@ -175,7 +181,7 @@
             </section>
 
             <!-- SECTION 1: A-SCAN ANALYSIS -->
-            <section>
+            <section id="ascan-analysis-section">
                 <div class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
                     <div>
                         <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -225,7 +231,7 @@
             </section>
 
             <!-- SECTION 2: DRIVER ANALYSIS -->
-            <section id="driver-section" class="hidden">
+            <section id="driver-section">
                 <div class="flex flex-col md:flex-row md:items-end justify-between mb-4 pt-6 border-t border-slate-200 gap-4">
                     <div>
                         <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -237,10 +243,10 @@
                         </p>
                     </div>
                     <div class="flex flex-col sm:flex-row items-center gap-4">
-                        <!-- Exclude 992/998 Toggle (NEW) -->
+                        <!-- Exclude 992/998 Toggle (RENAMED) -->
                         <label class="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none bg-white border border-slate-200 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
                             <input type="checkbox" id="toggle-exclude-99x" class="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 border-slate-300">
-                            Exclude 992/998 Routes
+                            Exclude 992/998
                         </label>
 
                         <!-- Exclude 203/230/213 Toggle -->
@@ -385,6 +391,7 @@
             show199: true,
             excludeExceptions: false, // 203, 230, 213
             exclude99XRoutes: false, // NEW: Exclude 992/998 routes
+            showAscanSection: true, // NEW: Toggle visibility of A-Scan section
             
             // Time Filters S1
             activeTimeLabelS1: 'All',
@@ -422,7 +429,8 @@
             toggle195: document.getElementById('toggle-195'),
             toggle199: document.getElementById('toggle-199'),
             toggleExclude: document.getElementById('toggle-exclude-exceptions'),
-            toggleExclude99X: document.getElementById('toggle-exclude-99x'), // NEW
+            toggleExclude99X: document.getElementById('toggle-exclude-99x'), 
+            toggleAscanSection: document.getElementById('toggle-ascan-section'), // NEW
 
             // New Section: Base Moved
             baseMovedSection: document.getElementById('base-moved-section'),
@@ -430,6 +438,7 @@
             copyBaseMoved: document.getElementById('copy-base-moved'),
 
             // Section 1
+            ascanAnalysisSection: document.getElementById('ascan-analysis-section'), // NEW ID
             ascanGrid: document.getElementById('ascan-grid'),
             copyS1: document.getElementById('copy-s1'),
             s1Count: document.getElementById('s1-count'),
@@ -490,6 +499,11 @@
             els.toggleExclude99X.addEventListener('change', (e) => { // NEW Listener
                 state.exclude99XRoutes = e.target.checked;
                 runAnalysis();
+            });
+            els.toggleAscanSection.addEventListener('change', (e) => { // NEW A-Scan Toggle
+                state.showAscanSection = e.target.checked;
+                // Only need to run render, not full analysis
+                els.ascanAnalysisSection.classList.toggle('hidden', !state.showAscanSection);
             });
             
             // Initialize time filter buttons
@@ -577,6 +591,23 @@
             if(viewName === 'dashboard') {
                 els.dashboardView.classList.remove('hidden');
                 els.driverDetailView.classList.add('hidden');
+                
+                // Scroll to the Driver Analysis section (Section 2)
+                const driverSection = document.getElementById('driver-section');
+                if (driverSection) {
+                    const navBarHeight = 64; 
+                    const offset = driverSection.offsetTop - navBarHeight;
+                    window.scrollTo({
+                        top: offset,
+                        behavior: 'smooth'
+                    });
+                } else {
+                     window.scrollTo(0, 0); 
+                }
+
+                // Ensure A-Scan visibility is respected on return
+                els.ascanAnalysisSection.classList.toggle('hidden', !state.showAscanSection);
+
                 setTimeout(() => lucide.createIcons(), 50);
             } else if(viewName === 'detail') {
                 els.dashboardView.classList.add('hidden');
@@ -778,6 +809,9 @@
                 });
                 renderBaseMoved(movedBase);
             }
+            
+            // --- Toggle A-Scan Section Visibility ---
+            els.ascanAnalysisSection.classList.toggle('hidden', !state.showAscanSection);
 
             // --- 1. Section 1: Inactivity (195/199) ---
             const timeRangeS1 = state.activeTimeRangeS1;
